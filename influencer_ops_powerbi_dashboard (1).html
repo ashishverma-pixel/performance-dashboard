@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Influencer Dispatch Ops — Analytics Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+*{box-sizing:border-box;margin:0;padding:0;font-family:'Inter',system-ui,sans-serif}
+:root{
+  --navy:#0D1B2A;--teal:#00A896;--red:#E24B4A;--amber:#F5A623;--green:#1D9E75;
+  --purple:#7F77DD;--card:#132638;--border:#1E3A52;--muted:#64748B;--light:#CBD5E1;
+  --bg:#0A1628;--sidebar:#0F2236;
+}
+html,body{height:100%;background:var(--bg)}
+.dash{background:var(--bg);min-height:100vh;display:grid;grid-template-columns:240px 1fr;grid-template-rows:52px 1fr}
+.topbar{grid-column:1/-1;background:var(--navy);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 20px}
+.topbar-title{font-size:14px;font-weight:600;color:#fff;letter-spacing:.3px}
+.topbar-sub{font-size:11px;color:var(--muted);margin-top:1px}
+.topbar-right{display:flex;align-items:center;gap:12px}
+.live-dot{width:7px;height:7px;border-radius:50%;background:var(--green);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.live-txt{font-size:11px;color:var(--green);font-weight:500}
+.last-upd{font-size:11px;color:var(--muted)}
+.logo-pill{background:rgba(0,168,150,.15);border:1px solid rgba(0,168,150,.3);color:var(--teal);font-size:10px;font-weight:600;padding:3px 10px;border-radius:20px;letter-spacing:.05em}
+.sidebar{background:var(--sidebar);border-right:1px solid var(--border);padding:14px 12px;overflow-y:auto}
+.slicer-title{font-size:10px;font-weight:600;color:var(--teal);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px;padding-bottom:4px;border-bottom:1px solid var(--border)}
+.slicer-section{margin-bottom:18px}
+.chip-group{display:flex;flex-wrap:wrap;gap:4px}
+.chip{padding:4px 9px;border-radius:20px;font-size:10px;font-weight:500;cursor:pointer;border:1px solid var(--border);color:var(--light);background:transparent;transition:all .15s}
+.chip:hover{border-color:var(--teal);color:var(--teal)}
+.chip.on{background:var(--teal);color:#fff;border-color:var(--teal)}
+.sender-chip{padding:4px 9px;border-radius:20px;font-size:10px;font-weight:500;cursor:pointer;border:1px solid var(--border);color:var(--light);background:transparent;transition:all .15s;display:flex;align-items:center;gap:5px}
+.sender-chip:hover{border-color:var(--purple);color:#fff}
+.sender-chip.on{background:var(--purple);color:#fff;border-color:var(--purple)}
+.s-av{width:16px;height:16px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;flex-shrink:0;color:#fff}
+.slicer-label{font-size:11px;color:var(--light);margin-bottom:5px}
+.range-wrap{padding:0 4px}
+.range-wrap input[type=range]{width:100%;accent-color:var(--teal);cursor:pointer}
+.range-vals{display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-top:3px}
+.mm{background:var(--card);border:1px solid var(--border);border-radius:6px;padding:8px 10px;margin-bottom:6px;cursor:pointer;transition:border-color .15s}
+.mm:hover{border-color:var(--teal)}
+.mm .mv{font-size:17px;font-weight:700;color:#fff}
+.mm .ml{font-size:9px;color:var(--muted);margin-top:1px;text-transform:uppercase;letter-spacing:.04em}
+.mm .mt{font-size:9px;margin-top:2px}
+.mm.red .mv{color:var(--red)}.mm.amber .mv{color:var(--amber)}.mm.green .mv{color:var(--green)}
+.main{padding:14px;overflow-y:auto}
+.kpi-row{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin-bottom:14px}
+.kpi{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:12px 14px;position:relative;overflow:hidden;transition:border-color .15s}
+.kpi:hover{border-color:var(--teal)}
+.kpi-ac{position:absolute;top:0;left:0;width:100%;height:3px}
+.kpi-val{font-size:22px;font-weight:700;color:#fff;margin-top:6px;line-height:1}
+.kpi-lbl{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.kpi-d{font-size:10px;margin-top:6px}
+.cr{display:grid;grid-template-columns:1.4fr 1fr;gap:12px;margin-bottom:12px}
+.cr2{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:12px}
+.cc{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:14px;transition:border-color .15s}
+.cc:hover{border-color:rgba(0,168,150,.3)}
+.ct{font-size:11px;font-weight:600;color:#fff;margin-bottom:2px}
+.cs{font-size:9px;color:var(--muted);margin-bottom:10px;text-transform:uppercase;letter-spacing:.04em}
+.cw{position:relative;width:100%}
+.zbr{margin-bottom:7px}
+.zbl{display:flex;justify-content:space-between;font-size:10px;color:var(--light);margin-bottom:3px}
+.zt{background:#1E3A52;border-radius:3px;height:20px;overflow:hidden}
+.zf{height:100%;border-radius:3px;display:flex;align-items:center;padding-left:8px;font-size:9px;font-weight:600;color:#fff;transition:width .6s ease}
+.rr{display:flex;align-items:center;padding:7px 0;border-bottom:1px solid var(--border);font-size:11px;gap:8px}
+.rr:last-child{border-bottom:none}
+.rb{padding:2px 7px;border-radius:3px;font-size:9px;font-weight:600;flex-shrink:0}
+.rb.h{background:rgba(226,75,74,.2);color:var(--red)}
+.rb.m{background:rgba(245,166,35,.2);color:var(--amber)}
+.rb.l{background:rgba(29,158,117,.2);color:var(--green)}
+.dw{display:flex;align-items:center;gap:16px}
+.dl{flex:1}
+.dlr{display:flex;align-items:center;gap:6px;font-size:10px;color:var(--light);margin-bottom:6px}
+.dld{width:8px;height:8px;border-radius:2px;flex-shrink:0}
+.reset-btn{width:100%;padding:7px;border-radius:6px;background:transparent;border:1px solid var(--border);color:var(--muted);font-size:10px;cursor:pointer;margin-top:8px;transition:all .15s;font-family:inherit}
+.reset-btn:hover{border-color:var(--teal);color:var(--teal)}
+.ftag{display:inline-flex;align-items:center;gap:4px;border:1px solid;padding:2px 8px;border-radius:12px;font-size:10px;margin:2px}
+.ftag.zone{background:rgba(0,168,150,.1);color:var(--teal);border-color:rgba(0,168,150,.3)}
+.ftag.sender{background:rgba(127,119,221,.1);color:var(--purple);border-color:rgba(127,119,221,.3)}
+.fbar{min-height:24px;margin-bottom:10px;display:flex;flex-wrap:wrap;align-items:center;gap:2px}
+.fbar-lbl{font-size:10px;color:var(--muted);margin-right:4px}
+.tabs{display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap}
+.tp{padding:5px 14px;border-radius:20px;font-size:11px;font-weight:500;cursor:pointer;border:1px solid var(--border);color:var(--muted);background:transparent;transition:all .15s;font-family:inherit}
+.tp:hover{border-color:var(--teal);color:var(--teal)}
+.tp.on{background:var(--teal);color:#fff;border-color:var(--teal)}
+.panel{display:none}.panel.show{display:block}
+.stbl{width:100%;border-collapse:collapse;font-size:11px}
+.stbl th{text-align:left;font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;padding:6px 8px;border-bottom:1px solid var(--border);letter-spacing:.04em}
+.stbl td{padding:7px 8px;border-bottom:1px solid var(--border);color:var(--light);vertical-align:middle}
+.stbl tr:last-child td{border-bottom:none}
+.stbl tr:hover td{background:rgba(0,168,150,.05)}
+.sbmini{height:5px;border-radius:3px;background:#1E3A52;overflow:hidden;margin-top:3px}
+.sbfill{height:100%;border-radius:3px}
+.tl{display:grid;grid-template-columns:repeat(5,1fr);margin-top:12px}
+.tlc{text-align:center;padding:10px 4px;border-right:1px solid #1E3A52}
+.tlc:last-child{border-right:none}
+.tld{width:14px;height:14px;border-radius:50%;margin:0 auto 6px}
+.ib{border-radius:6px;padding:10px 14px;margin-top:12px;font-size:11px;line-height:1.6}
+</style>
+</head>
+<body>
+<div class="dash">
+
+<div class="topbar">
+  <div>
+    <div class="topbar-title">Influencer Dispatch Operations — Analytics Dashboard</div>
+    <div class="topbar-sub" id="tb-ctx">Delhi WH · PAN India · March 2026 · All senders · All zones</div>
+  </div>
+  <div class="topbar-right">
+    <div class="live-dot"></div><span class="live-txt">Live</span>
+    <span class="last-upd">Last updated: 11 Mar 2026</span>
+    <span class="logo-pill">SC OPS</span>
+  </div>
+</div>
+
+<div class="sidebar">
+
+  <div class="slicer-section">
+    <div class="slicer-title">Sender person</div>
+    <div class="chip-group" id="sc">
+      <div class="sender-chip on" onclick="doSender('all',this)"><span class="s-av" style="background:#1E3A52">A</span>All</div>
+      <div class="sender-chip" onclick="doSender('Shalini',this)"><span class="s-av" style="background:#1D9E75">SH</span>Shalini</div>
+      <div class="sender-chip" onclick="doSender('Simar',this)"><span class="s-av" style="background:#378ADD">SI</span>Simar</div>
+      <div class="sender-chip" onclick="doSender('Shreya',this)"><span class="s-av" style="background:#F5A623">SR</span>Shreya</div>
+      <div class="sender-chip" onclick="doSender('Muskan',this)"><span class="s-av" style="background:#E24B4A">MU</span>Muskan</div>
+      <div class="sender-chip" onclick="doSender('Rhytham',this)"><span class="s-av" style="background:#534AB7">RH</span>Rhytham</div>
+      <div class="sender-chip" onclick="doSender('Agrima',this)"><span class="s-av" style="background:#00A896">AG</span>Agrima</div>
+      <div class="sender-chip" onclick="doSender('Rakhi Singh',this)"><span class="s-av" style="background:#D85A30">RK</span>Rakhi Singh</div>
+      <div class="sender-chip" onclick="doSender('Sanya',this)"><span class="s-av" style="background:#639922">SA</span>Sanya</div>
+    </div>
+  </div>
+
+  <div class="slicer-section">
+    <div class="slicer-title">Zone slicer</div>
+    <div class="chip-group" id="zc">
+      <div class="chip on" onclick="doZone('all',this)">All zones</div>
+      <div class="chip" onclick="doZone('z_a',this)">Zone A</div>
+      <div class="chip" onclick="doZone('z_b',this)">Zone B</div>
+      <div class="chip" onclick="doZone('z_c',this)">Zone C</div>
+      <div class="chip" onclick="doZone('z_d',this)">Zone D</div>
+      <div class="chip" onclick="doZone('z_e',this)">Zone E</div>
+    </div>
+  </div>
+
+  <div class="slicer-section">
+    <div class="slicer-title">TAT threshold (days)</div>
+    <div class="slicer-label">Max acceptable: <strong id="tv" style="color:var(--teal)">3</strong> days</div>
+    <div class="range-wrap">
+      <input type="range" min="1" max="5" step="1" value="3" oninput="document.getElementById('tv').textContent=this.value">
+      <div class="range-vals"><span>1d</span><span>3d</span><span>5d</span></div>
+    </div>
+  </div>
+
+  <div class="slicer-section">
+    <div class="slicer-title">Labor cost / hr (₹)</div>
+    <div class="slicer-label">Rate: <strong id="lv" style="color:var(--amber)">₹160</strong></div>
+    <div class="range-wrap">
+      <input type="range" min="80" max="300" step="10" value="160" id="lcs" oninput="doLC(this.value)">
+      <div class="range-vals"><span>₹80</span><span>₹190</span><span>₹300</span></div>
+    </div>
+  </div>
+
+  <div class="slicer-section">
+    <div class="slicer-title">Quick KPIs</div>
+    <div class="mm red"><div class="mv" id="sb1">3,789</div><div class="ml">Campaign risk orders</div><div class="mt" style="color:var(--red)">Non-ZA undelivered</div></div>
+    <div class="mm amber"><div class="mv" id="sb2">₹20,374</div><div class="ml">Monthly labor cost</div><div class="mt" style="color:var(--amber)">Manual ops spend</div></div>
+    <div class="mm green"><div class="mv" id="sb3">₹15,574</div><div class="ml">Automation saving</div><div class="mt" style="color:var(--green)">vs ₹4,800 Make.com</div></div>
+    <button class="reset-btn" onclick="doReset()">↺ Reset all filters</button>
+  </div>
+
+</div>
+
+<div class="main">
+  <div class="fbar" id="fb"></div>
+  <div class="tabs">
+    <div class="tp on" onclick="showP('overview',this)">Overview</div>
+    <div class="tp" onclick="showP('sender',this)">Sender analysis</div>
+    <div class="tp" onclick="showP('zone',this)">Zone analysis</div>
+    <div class="tp" onclick="showP('courier',this)">Courier performance</div>
+    <div class="tp" onclick="showP('labor',this)">Labor cost</div>
+    <div class="tp" onclick="showP('risk',this)">Risk register</div>
+  </div>
+
+  <!-- OVERVIEW -->
+  <div id="panel-overview" class="panel show">
+    <div class="kpi-row">
+      <div class="kpi"><div class="kpi-ac" style="background:var(--teal)"></div><div class="kpi-lbl">Total orders</div><div class="kpi-val" id="k-tot">6,723</div><div class="kpi-d" style="color:var(--teal)" id="k-tot-c">All senders</div></div>
+      <div class="kpi"><div class="kpi-ac" style="background:var(--green)"></div><div class="kpi-lbl">Delivered</div><div class="kpi-val" style="color:var(--green)" id="k-del">2,460</div><div class="kpi-d" style="color:var(--muted)" id="k-del-p">36.6%</div></div>
+      <div class="kpi"><div class="kpi-ac" style="background:var(--red)"></div><div class="kpi-lbl">EDD breached</div><div class="kpi-val" style="color:var(--red)" id="k-edd">1,629</div><div class="kpi-d" style="color:var(--red)" id="k-edd-p">24.4%</div></div>
+      <div class="kpi"><div class="kpi-ac" style="background:var(--amber)"></div><div class="kpi-lbl">Freight spend</div><div class="kpi-val" style="color:var(--amber)" id="k-fr">₹2.34L</div><div class="kpi-d" style="color:var(--muted)" id="k-fr-a">₹35 avg</div></div>
+      <div class="kpi"><div class="kpi-ac" style="background:var(--purple)"></div><div class="kpi-lbl">Process pending</div><div class="kpi-val" style="color:var(--purple)" id="k-pend">943</div><div class="kpi-d" style="color:var(--purple)" id="k-pend-p">14.0%</div></div>
+    </div>
+    <div class="cr">
+      <div class="cc">
+        <div class="ct">Order status breakdown</div><div class="cs" id="dc-ctx">All senders · all zones</div>
+        <div class="dw">
+          <div style="position:relative;width:130px;height:130px;flex-shrink:0"><canvas id="dChart"></canvas></div>
+          <div class="dl">
+            <div class="dlr"><span class="dld" style="background:#1D9E75"></span><span id="dl1">Delivered — 2,460 (36.6%)</span></div>
+            <div class="dlr"><span class="dld" style="background:#378ADD"></span>In transit — 3,097 (46.1%)</div>
+            <div class="dlr"><span class="dld" style="background:#F5A623"></span>First mile — 378 (5.6%)</div>
+            <div class="dlr"><span class="dld" style="background:#E24B4A"></span>RTO/cancel — 13 (0.2%)</div>
+            <div class="dlr"><span class="dld" style="background:#64748B"></span>Not serviceable — 106</div>
+            <div class="dlr"><span class="dld" style="background:#534AB7"></span><span id="dl6">Pending — 669 (9.9%)</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="cc">
+        <div class="ct">Delivery rate by zone</div><div class="cs">% delivered · Delhi WH</div>
+        <div class="zbr"><div class="zbl"><span>Zone A — NCR</span><span style="color:#1D9E75" id="zr-a">64.6%</span></div><div class="zt"><div class="zf" id="zf-a" style="width:64.6%;background:#1D9E75">64.6%</div></div></div>
+        <div class="zbr"><div class="zbl"><span>Zone B — North</span><span style="color:#5DCAA5" id="zr-b">35.1%</span></div><div class="zt"><div class="zf" id="zf-b" style="width:35.1%;background:#5DCAA5">35.1%</div></div></div>
+        <div class="zbr"><div class="zbl"><span>Zone C — West</span><span style="color:#F5A623" id="zr-c">31.8%</span></div><div class="zt"><div class="zf" id="zf-c" style="width:31.8%;background:#F5A623">31.8%</div></div></div>
+        <div class="zbr"><div class="zbl"><span>Zone D — East</span><span style="color:#D85A30" id="zr-d">30.5%</span></div><div class="zt"><div class="zf" id="zf-d" style="width:30.5%;background:#D85A30">30.5%</div></div></div>
+        <div class="zbr"><div class="zbl"><span>Zone E — Far NE/South</span><span style="color:#E24B4A" id="zr-e">27.4%</span></div><div class="zt"><div class="zf" id="zf-e" style="width:27.4%;background:#E24B4A">27.4%</div></div></div>
+      </div>
+    </div>
+    <div class="cr2">
+      <div class="cc"><div class="ct">Orders by zone</div><div class="cs">Volume distribution</div><div class="cw" style="height:180px"><canvas id="vChart"></canvas></div></div>
+      <div class="cc"><div class="ct">Freight vs delivery rate</div><div class="cs">Efficiency scatter by zone</div><div class="cw" style="height:180px"><canvas id="sChart"></canvas></div></div>
+      <div class="cc"><div class="ct">EDD breach by zone</div><div class="cs">Breach count this month</div><div class="cw" style="height:180px"><canvas id="eChart"></canvas></div></div>
+    </div>
+  </div>
+
+  <!-- SENDER ANALYSIS -->
+  <div id="panel-sender" class="panel">
+    <div class="kpi-row" style="grid-template-columns:repeat(4,minmax(0,1fr))">
+      <div class="kpi"><div class="kpi-ac" style="background:var(--purple)"></div><div class="kpi-lbl">Active senders</div><div class="kpi-val" style="color:var(--purple)">9</div><div class="kpi-d" style="color:var(--muted)">≥10 orders/month</div></div>
+      <div class="kpi"><div class="kpi-ac" style="background:var(--teal)"></div><div class="kpi-lbl">Top sender</div><div class="kpi-val" style="color:var(--teal)">Shalini</div><div class="kpi-d" style="color:var(--muted)">3,847 orders · 57.2%</div></div>
+      <div class="kpi"><div class="kpi-ac" style="background:var(--red)"></div><div class="kpi-lbl">Highest pending %</div><div class="kpi-val" style="color:var(--red)">Simar</div><div class="kpi-d" style="color:var(--red)">34.9% pending rate</div></div>
+      <div class="kpi"><div class="kpi-ac" style="background:var(--amber)"></div><div class="kpi-lbl">Selected sender</div><div class="kpi-val" style="color:var(--amber);font-size:16px" id="k-sel">All senders</div><div class="kpi-d" style="color:var(--muted)" id="k-sel-o">6,723 orders</div></div>
+    </div>
+    <div class="cr">
+      <div class="cc"><div class="ct">Orders per sender</div><div class="cs">Total orders this month</div><div class="cw" style="height:260px"><canvas id="svChart"></canvas></div></div>
+      <div class="cc"><div class="ct">Pending rate per sender</div><div class="cs">% still process-pending</div><div class="cw" style="height:260px"><canvas id="spChart"></canvas></div></div>
+    </div>
+    <div class="cc">
+      <div class="ct">Sender-wise order detail</div>
+      <div class="cs">Click a sender chip on the left to filter all dashboards</div>
+      <table class="stbl"><thead><tr><th>Sender</th><th>Orders</th><th>Processed</th><th>Pending</th><th>Pending %</th><th>Delivery rate</th><th>Avg freight</th><th>Zone spread</th></tr></thead>
+      <tbody id="stbody"></tbody></table>
+    </div>
+  </div>
+
+  <!-- ZONE ANALYSIS -->
+  <div id="panel-zone" class="panel">
+    <div class="kpi-row" style="grid-template-columns:repeat(4,minmax(0,1fr))">
+      <div class="kpi"><div class="kpi-ac" style="background:var(--green)"></div><div class="kpi-lbl">Zone A avg TAT</div><div class="kpi-val" style="color:var(--green)">0.2d</div><div class="kpi-d" style="color:var(--green)">Same-day delivery</div></div>
+      <div class="kpi"><div class="kpi-ac" style="background:var(--red)"></div><div class="kpi-lbl">Zone E avg TAT</div><div class="kpi-val" style="color:var(--red)">3.3d</div><div class="kpi-d" style="color:var(--red)">+3.1 days vs Zone A</div></div>
+      <div class="kpi"><div class="kpi-ac" style="background:var(--amber)"></div><div class="kpi-lbl">Non-ZA at risk</div><div class="kpi-val" style="color:var(--amber)" id="k-nza">3,789</div><div class="kpi-d" style="color:var(--amber)">65–73% undelivered</div></div>
+      <div class="kpi"><div class="kpi-ac" style="background:var(--red)"></div><div class="kpi-lbl">Max campaign delay</div><div class="kpi-val" style="color:var(--red)">3.1d</div><div class="kpi-d" style="color:var(--red)">Zone E vs Zone A</div></div>
+    </div>
+    <div class="cr">
+      <div class="cc"><div class="ct">Avg TAT — Zone A baseline vs others</div><div class="cs">Delivery days from Delhi WH</div><div class="cw" style="height:260px"><canvas id="tChart"></canvas></div></div>
+      <div class="cc"><div class="ct">Freight cost by zone</div><div class="cs">Avg ₹ per order</div><div class="cw" style="height:260px"><canvas id="fzChart"></canvas></div></div>
+    </div>
+    <div class="cc">
+      <div class="ct">Campaign window impact — same brief, different go-live</div>
+      <div class="cs">Zone A posts on time · Zone E posts 3.1 days late</div>
+      <div class="tl">
+        <div class="tlc"><div class="tld" style="background:#64748B"></div><div style="font-size:11px;font-weight:600;color:#64748B">Day 0</div><div style="font-size:10px;color:#94A3B8;line-height:1.4">Dispatched<br>Delhi WH</div></div>
+        <div class="tlc"><div class="tld" style="background:#1D9E75"></div><div style="font-size:11px;font-weight:600;color:#1D9E75">Day 0.2</div><div style="font-size:10px;color:#94A3B8;line-height:1.4">Zone A<br>Delivered</div></div>
+        <div class="tlc"><div class="tld" style="background:#F5A623"></div><div style="font-size:11px;font-weight:600;color:#F5A623">Day 1–3</div><div style="font-size:10px;color:#94A3B8;line-height:1.4">Zone B/C<br>Delivered</div></div>
+        <div class="tlc"><div class="tld" style="background:#E24B4A"></div><div style="font-size:11px;font-weight:600;color:#E24B4A">Day 3–4</div><div style="font-size:10px;color:#94A3B8;line-height:1.4">Zone D/E<br>Delivered</div></div>
+        <div class="tlc"><div class="tld" style="background:#E24B4A"></div><div style="font-size:11px;font-weight:600;color:#E24B4A">Day 10+</div><div style="font-size:10px;color:#94A3B8;line-height:1.4">Campaign<br>Go-Live closes</div></div>
+      </div>
+      <div class="ib" style="background:rgba(226,75,74,.1);border:1px solid rgba(226,75,74,.2);color:#F87171">A North influencer (Zone A/B) posts 2–3 days earlier — more algorithm boost, higher engagement, brand's full attention at launch. A South/East influencer posts into a post-peak window. This is not a logistics problem. It is a campaign equity problem.</div>
+    </div>
+  </div>
+
+  <!-- COURIER -->
+  <div id="panel-courier" class="panel">
+    <div class="cc" style="margin-bottom:12px">
+      <div class="ct">Courier delivery rate — ranked best to worst</div><div class="cs">68% of volume goes through the two worst-performing couriers</div>
+      <div class="cw" style="height:320px"><canvas id="cChart"></canvas></div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;font-size:10px;color:var(--muted)">
+        <span style="display:flex;align-items:center;gap:4px"><span style="width:8px;height:8px;border-radius:2px;background:#1D9E75"></span>≥70% delivery</span>
+        <span style="display:flex;align-items:center;gap:4px"><span style="width:8px;height:8px;border-radius:2px;background:#F5A623"></span>50–70%</span>
+        <span style="display:flex;align-items:center;gap:4px"><span style="width:8px;height:8px;border-radius:2px;background:#E24B4A"></span>&lt;50% high-volume problem</span>
+      </div>
+    </div>
+    <div class="cr2">
+      <div class="cc"><div class="ct">EDD breach by courier</div><div class="cs">Count this month</div><div class="cw" style="height:200px"><canvas id="ceChart"></canvas></div></div>
+      <div class="cc"><div class="ct">Avg freight by courier</div><div class="cs">Cost per order (₹)</div><div class="cw" style="height:200px"><canvas id="cfChart"></canvas></div></div>
+      <div class="cc"><div class="ct">Key findings</div><div class="cs">Courier summary</div>
+        <div class="rr"><span style="color:#94A3B8;flex:1">Delhivery volume share</span><span style="color:var(--red);font-weight:600">38% of orders</span></div>
+        <div class="rr"><span style="color:#94A3B8;flex:1">Delhivery delivery rate</span><span style="color:var(--red);font-weight:600">32.9% only</span></div>
+        <div class="rr"><span style="color:#94A3B8;flex:1">Shadowfax MSP delivery</span><span style="color:var(--red);font-weight:600">25.4%</span></div>
+        <div class="rr"><span style="color:#94A3B8;flex:1">Xpressbees ME delivery</span><span style="color:var(--green);font-weight:600">89.5% ✓</span></div>
+        <div class="rr"><span style="color:#94A3B8;flex:1">Bluedart delivery rate</span><span style="color:var(--red);font-weight:600">16.0%</span></div>
+        <div style="background:rgba(245,166,35,.1);border-radius:6px;padding:8px;margin-top:8px;font-size:10px;color:#FCD34D">Priority routing to Xpressbees requires system-level courier selection — impossible manually today.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- LABOR COST -->
+  <div id="panel-labor" class="panel">
+    <div class="kpi-row">
+      <div class="kpi"><div class="kpi-ac" style="background:var(--amber)"></div><div class="kpi-lbl">Monthly labor cost</div><div class="kpi-val" style="color:var(--amber)" id="k-lc">₹20,374</div><div class="kpi-d" style="color:var(--muted)">Manual ops (non-ZA)</div></div>
+      <div class="kpi"><div class="kpi-ac" style="background:var(--green)"></div><div class="kpi-lbl">Automation cost</div><div class="kpi-val" style="color:var(--green)">₹4,800</div><div class="kpi-d" style="color:var(--green)">Make.com + Zapier</div></div>
+      <div class="kpi"><div class="kpi-ac" style="background:var(--green)"></div><div class="kpi-lbl">Monthly saving</div><div class="kpi-val" style="color:var(--green)" id="k-sv">₹15,574</div><div class="kpi-d" style="color:var(--green)">Net saving</div></div>
+      <div class="kpi"><div class="kpi-ac" style="background:var(--teal)"></div><div class="kpi-lbl">ROI multiple</div><div class="kpi-val" style="color:var(--teal)" id="k-roi">4.2×</div><div class="kpi-d" style="color:var(--teal)">Labor vs automation</div></div>
+      <div class="kpi"><div class="kpi-ac" style="background:var(--amber)"></div><div class="kpi-lbl">Portal payback</div><div class="kpi-val" style="color:var(--amber)" id="k-pb">32 mo</div><div class="kpi-d" style="color:var(--muted)">w/ campaign saves: ~8 mo</div></div>
+    </div>
+    <div class="cr">
+      <div class="cc"><div class="ct">Labor cost breakdown</div><div class="cs">Adjust rate via sidebar slider</div><div class="cw" style="height:260px"><canvas id="lChart"></canvas></div></div>
+      <div class="cc"><div class="ct">Manual vs automation — 12-month cumulative</div><div class="cs">Including ₹5L portal investment</div><div class="cw" style="height:260px"><canvas id="cuChart"></canvas></div></div>
+    </div>
+    <div class="cc">
+      <div class="ct">Manual task breakdown</div><div class="cs">Eliminated by Option 2 (Make.com)</div>
+      <div class="rr"><span style="flex:2;color:#CBD5E1">Daily Shiprocket report download + check</span><span style="color:var(--red);font-weight:600;flex:1">26× / month</span><span class="rb h">High</span></div>
+      <div class="rr"><span style="flex:2;color:#CBD5E1">NDR email loops (3 per case × 24)</span><span style="color:var(--red);font-weight:600;flex:1">72 emails / mo</span><span class="rb h">High</span></div>
+      <div class="rr"><span style="flex:2;color:#CBD5E1">EDD breach consolidation for SR team</span><span style="color:var(--amber);font-weight:600;flex:1">1,629 cases</span><span class="rb m">Med</span></div>
+      <div class="rr"><span style="flex:2;color:#CBD5E1">Non-serviceable pin code manual check</span><span style="color:var(--amber);font-weight:600;flex:1">106 cases / mo</span><span class="rb m">Med</span></div>
+      <div class="rr"><span style="flex:2;color:#CBD5E1">Batch-specific video approval loop</span><span style="color:var(--muted);flex:1">Manual every time</span><span class="rb m">Med</span></div>
+      <div class="rr"><span style="flex:2;color:#CBD5E1">Approval email + tracker update per order</span><span style="color:var(--muted);flex:1">6,723 orders</span><span class="rb l">Low</span></div>
+    </div>
+  </div>
+
+  <!-- RISK REGISTER -->
+  <div id="panel-risk" class="panel">
+    <div class="kpi-row" style="grid-template-columns:repeat(4,minmax(0,1fr))">
+      <div class="kpi"><div class="kpi-ac" style="background:var(--red)"></div><div class="kpi-lbl">High severity risks</div><div class="kpi-val" style="color:var(--red)">5</div><div class="kpi-d" style="color:var(--red)">Unmitigated</div></div>
+      <div class="kpi"><div class="kpi-ac" style="background:var(--amber)"></div><div class="kpi-lbl">Medium risks</div><div class="kpi-val" style="color:var(--amber)">4</div><div class="kpi-d" style="color:var(--muted)">Partial controls only</div></div>
+      <div class="kpi"><div class="kpi-ac" style="background:var(--red)"></div><div class="kpi-lbl">Pilferage exposure</div><div class="kpi-val" style="color:var(--red)">Untracked</div><div class="kpi-d" style="color:var(--red)">No system control</div></div>
+      <div class="kpi"><div class="kpi-ac" style="background:var(--amber)"></div><div class="kpi-lbl">Campaign slots at risk</div><div class="kpi-val" style="color:var(--amber)" id="k-rs">3,789</div><div class="kpi-d" style="color:var(--muted)">Non-ZA undelivered</div></div>
+    </div>
+    <div class="cc">
+      <div class="ct">Risk register — manual process gaps</div><div class="cs">Every risk below is unmitigated · zero system controls today</div>
+      <div class="rr"><span style="flex:2;color:#CBD5E1;font-size:11px">EDD breached shipments</span><span style="flex:1;color:var(--red);font-size:11px;font-weight:600">1,629 this month</span><span style="flex:2;color:var(--muted);font-size:10px;font-style:italic">No proactive tracking alert</span><span class="rb h">High</span></div>
+      <div class="rr"><span style="flex:2;color:#CBD5E1;font-size:11px">Orders process-pending</span><span style="flex:1;color:var(--red);font-size:11px;font-weight:600">943 pending</span><span style="flex:2;color:var(--muted);font-size:10px;font-style:italic">No system-led SLA</span><span class="rb h">High</span></div>
+      <div class="rr"><span style="flex:2;color:#CBD5E1;font-size:11px">NDR — influencer got no delivery code</span><span style="flex:1;color:var(--red);font-size:11px;font-weight:600">24 cases</span><span style="flex:2;color:var(--muted);font-size:10px;font-style:italic">No OTP/tracking touchpoint</span><span class="rb h">High</span></div>
+      <div class="rr"><span style="flex:2;color:#CBD5E1;font-size:11px">Pilferage / quantity mismatch</span><span style="flex:1;color:var(--red);font-size:11px;font-weight:600">Untracked</span><span style="flex:2;color:var(--muted);font-size:10px;font-style:italic">No system quantity control</span><span class="rb h">High</span></div>
+      <div class="rr"><span style="flex:2;color:#CBD5E1;font-size:11px">Batch-specific order errors</span><span style="flex:1;color:var(--red);font-size:11px;font-weight:600">Manual always</span><span style="flex:2;color:var(--muted);font-size:10px;font-style:italic">No LIFO/batch logic</span><span class="rb h">High</span></div>
+      <div class="rr"><span style="flex:2;color:#CBD5E1;font-size:11px">Campaign window miss (zone TAT)</span><span style="flex:1;color:var(--red);font-size:11px;font-weight:600">3,789 at risk</span><span style="flex:2;color:var(--muted);font-size:10px;font-style:italic">No delivery-to-campaign link</span><span class="rb h">High</span></div>
+      <div class="rr"><span style="flex:2;color:#CBD5E1;font-size:11px">Non-serviceable pincode</span><span style="flex:1;color:var(--amber);font-size:11px;font-weight:600">106 cases</span><span style="flex:2;color:var(--muted);font-size:10px;font-style:italic">Manual pin check only</span><span class="rb m">Med</span></div>
+      <div class="rr"><span style="flex:2;color:#CBD5E1;font-size:11px">Cancellation post-dispatch</span><span style="flex:1;color:var(--amber);font-size:11px;font-weight:600">6 this month</span><span style="flex:2;color:var(--muted);font-size:10px;font-style:italic">No pre-dispatch confirmation</span><span class="rb m">Med</span></div>
+      <div class="rr"><span style="flex:2;color:#CBD5E1;font-size:11px">RTO, no NDR recovery</span><span style="flex:1;color:var(--amber);font-size:11px;font-weight:600">7 cases</span><span style="flex:2;color:var(--muted);font-size:10px;font-style:italic">No NDR escalation workflow</span><span class="rb m">Med</span></div>
+      <div class="rr"><span style="flex:2;color:#CBD5E1;font-size:11px">Damaged in transit</span><span style="flex:1;color:var(--amber);font-size:11px;font-weight:600">3 cases</span><span style="flex:2;color:var(--muted);font-size:10px;font-style:italic">No courier SLA enforcement</span><span class="rb m">Med</span></div>
+    </div>
+  </div>
+
+</div>
+</div>
+
+<script>
+const ZD={z_a:{total:1195,delivered:772,rate:64.6,tat:0.2,freight:24.4,edd:19,undeliv:423},z_b:{total:1200,delivered:421,rate:35.1,tat:1.2,freight:29.4,edd:25,undeliv:779},z_c:{total:1139,delivered:362,rate:31.8,tat:2.7,freight:36.9,edd:17,undeliv:777},z_d:{total:2450,delivered:747,rate:30.5,tat:3.0,freight:40.2,edd:69,undeliv:1703},z_e:{total:576,delivered:158,rate:27.4,tat:3.3,freight:50.7,edd:6,undeliv:418}};
+const SD={'Shalini':{orders:3847,processed:3847,pending:0,pRate:0,dRate:8.8,freight:32.9,zones:{z_a:1584,z_b:2043,z_c:1863,z_d:4077,z_e:1035},color:'#1D9E75',ini:'SH'},'Simar':{orders:2141,processed:1393,pending:748,pRate:34.9,dRate:46.9,freight:31.6,zones:{z_a:252,z_b:288,z_c:236,z_d:537,z_e:102},color:'#378ADD',ini:'SI'},'Shreya':{orders:103,processed:103,pending:0,pRate:0,dRate:66.2,freight:28.7,zones:{z_a:125,z_b:24,z_c:16,z_d:36,z_e:0},color:'#F5A623',ini:'SR'},'Muskan':{orders:97,processed:34,pending:63,pRate:64.9,dRate:0,freight:27.7,zones:{z_a:95,z_b:10,z_c:9,z_d:8,z_e:0},color:'#E24B4A',ini:'MU'},'Rhytham':{orders:82,processed:82,pending:0,pRate:0,dRate:77.4,freight:53.1,zones:{z_a:15,z_b:6,z_c:21,z_d:10,z_e:10},color:'#534AB7',ini:'RH'},'Agrima':{orders:79,processed:79,pending:0,pRate:0,dRate:100,freight:44.8,zones:{z_a:95,z_b:28,z_c:47,z_d:18,z_e:9},color:'#00A896',ini:'AG'},'Rakhi Singh':{orders:54,processed:54,pending:0,pRate:0,dRate:92.1,freight:33.5,zones:{z_a:132,z_b:2,z_c:24,z_d:15,z_e:5},color:'#D85A30',ini:'RK'},'Sanya':{orders:30,processed:30,pending:0,pRate:0,dRate:97.4,freight:28.9,zones:{z_a:23,z_b:0,z_c:10,z_d:4,z_e:1},color:'#639922',ini:'SA'}};
+const COURIERS=[{n:'Xpressbees ME',rate:89.5,vol:286,freight:36.3,edd:147},{n:'Ekart ME',rate:80.3,vol:76,freight:53.4,edd:57},{n:'SkyeAir',rate:79.2,vol:48,freight:29.5,edd:38},{n:'Pikndel NDD',rate:66.5,vol:729,freight:24.4,edd:299},{n:'Sfx NDD',rate:53.2,vol:173,freight:22.8,edd:60},{n:'Sfx IC NDD',rate:31.5,vol:346,freight:26.1,edd:56},{n:'Delhivery',rate:32.9,vol:2560,freight:36.3,edd:591},{n:'Sfx MSP',rate:25.4,vol:1965,freight:34.9,edd:328},{n:'Bluedart',rate:16.0,vol:313,freight:62.2,edd:30}];
+let cS='all',cZ='all',cLC=160;
+const charts={};
+const GR='rgba(100,116,139,0.15)',TK={color:'#64748B',font:{size:9}};
+const BO={responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{color:GR},ticks:TK},y:{grid:{color:GR},ticks:TK}}};
+
+function zones(){return cZ==='all'?Object.keys(ZD):[cZ]}
+function fi(){const zk=Object.keys(ZD);return cZ==='all'?[0,1,2,3,4]:[zk.indexOf(cZ)]}
+function fmtR(n){return n>=100000?'₹'+(n/100000).toFixed(2)+'L':'₹'+Math.round(n).toLocaleString('en-IN')}
+
+function gv(key){
+  if(cS==='all') return zones().reduce((s,z)=>s+ZD[z][key],0);
+  const sd=SD[cS],st=Object.values(sd.zones).reduce((a,b)=>a+b,0);
+  const ft=zones().reduce((s,z)=>s+(sd.zones[z]||0),0);
+  if(key==='total') return ft;
+  if(key==='delivered') return Math.round(ft*(sd.dRate/100));
+  if(key==='undeliv') return ft-Math.round(ft*(sd.dRate/100));
+  if(key==='edd') return Math.round(zones().reduce((s,z)=>s+ZD[z].edd,0)*(st>0?ft/st:1)*(sd.orders/6723));
+  return zones().reduce((s,z)=>s+ZD[z][key],0);
+}
+
+function upd(){
+  const tot=gv('total'),del=gv('delivered'),und=gv('undeliv'),edd=gv('edd');
+  const sd=cS!=='all'?SD[cS]:null;
+  const pend=sd?sd.pending:943;
+  const fr=cS!=='all'?SD[cS].freight*tot:zones().reduce((s,z)=>s+ZD[z].total*ZD[z].freight,0);
+
+  const set=(id,v)=>{const el=document.getElementById(id);if(el)el.textContent=v;};
+  set('k-tot',tot.toLocaleString('en-IN'));
+  set('k-tot-c',(cS!=='all'?cS:'All senders')+' · March 2026');
+  set('k-del',del.toLocaleString('en-IN'));
+  set('k-del-p',tot>0?Math.round(del/tot*100)+'%':'–');
+  set('k-edd',edd.toLocaleString('en-IN'));
+  set('k-edd-p',tot>0?Math.round(edd/tot*100)+'% of orders':'–');
+  set('k-fr',fmtR(Math.round(fr)));
+  set('k-fr-a','₹'+Math.round(fr/Math.max(tot,1))+' avg');
+  set('k-pend',pend.toLocaleString('en-IN'));
+  set('k-pend-p',tot>0?Math.round(pend/tot*100)+'% pending':'–');
+  set('sb1',und.toLocaleString('en-IN'));
+  const lc=Math.round(cLC*8*26*(und/6723));
+  set('sb2',fmtR(lc));
+  const sv=lc-4800;
+  set('sb3',sv>0?fmtR(sv):'–');
+  set('k-lc',fmtR(lc));
+  set('k-sv',sv>0?fmtR(sv):'–');
+  set('k-roi',(lc/4800).toFixed(1)+'×');
+  set('k-pb',Math.round(500000/Math.max(sv,1))+' mo');
+  set('k-nza',und.toLocaleString('en-IN'));
+  set('k-rs',und.toLocaleString('en-IN'));
+  set('k-sel',cS!=='all'?cS:'All senders');
+  set('k-sel-o',tot.toLocaleString('en-IN')+' orders');
+  set('dl1','Delivered — '+del.toLocaleString('en-IN')+' ('+Math.round(del/Math.max(tot,1)*100)+'%)');
+  set('dc-ctx',(cS!=='all'?cS:'All senders')+' · '+(cZ!=='all'?cZ.replace('z_','Zone ').toUpperCase():'all zones'));
+
+  const zks=['z_a','z_b','z_c','z_d','z_e'],zis=['a','b','c','d','e'];
+  zks.forEach((z,i)=>{
+    let r=ZD[z].rate;
+    if(cS!=='all'){const sd2=SD[cS],sz=sd2.zones[z]||0,st2=Object.values(sd2.zones).reduce((a,b)=>a+b,0);r=st2>0?+(sd2.dRate*(sz/st2)).toFixed(1):0;}
+    const f=document.getElementById('zf-'+zis[i]),rt=document.getElementById('zr-'+zis[i]);
+    if(f){f.style.width=r+'%';f.textContent=r.toFixed(1)+'%';}
+    if(rt) rt.textContent=r.toFixed(1)+'%';
+  });
+
+  const ctx=[];
+  if(cS!=='all') ctx.push('Sender: '+cS);
+  if(cZ!=='all') ctx.push(cZ.replace('z_','Zone ').toUpperCase());
+  document.getElementById('tb-ctx').textContent='Delhi WH · PAN India · March 2026 · '+(ctx.length?ctx.join(' · '):'All senders · All zones');
+
+  const fb=document.getElementById('fb');
+  if(ctx.length){
+    fb.innerHTML='<span class="fbar-lbl">Active:</span>'+
+      (cS!=='all'?`<span class="ftag sender">Sender: ${cS} ✕</span>`:'')+(cZ!=='all'?`<span class="ftag zone">${cZ.replace('z_','Zone ').toUpperCase()} ✕</span>`:'');
+  } else fb.innerHTML='';
+
+  buildTable();
+}
+
+function buildTable(){
+  const tbody=document.getElementById('stbody');
+  tbody.innerHTML=Object.entries(SD).sort((a,b)=>b[1].orders-a[1].orders).map(([n,d])=>{
+    const pc=d.pRate>50?'#E24B4A':d.pRate>20?'#F5A623':'#1D9E75';
+    const dc=d.dRate>=70?'#1D9E75':d.dRate>=40?'#F5A623':'#E24B4A';
+    const hi=cS===n;
+    const zs=Object.entries(d.zones).filter(([,v])=>v>0).map(([k,v])=>k.replace('z_','Z')+':'+v).join(' ');
+    return `<tr style="${hi?'background:rgba(127,119,221,.08)':''}">
+      <td><div style="display:flex;align-items:center;gap:6px">
+        <span style="width:20px;height:20px;border-radius:50%;background:${d.color};display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;color:#fff;flex-shrink:0">${d.ini}</span>
+        <span style="font-weight:${hi?600:400};color:${hi?'#fff':'#CBD5E1'}">${n}</span>
+      </div></td>
+      <td style="font-weight:600">${d.orders.toLocaleString('en-IN')}</td>
+      <td style="color:#1D9E75">${d.processed.toLocaleString('en-IN')}</td>
+      <td style="color:${pc};font-weight:600">${d.pending}</td>
+      <td><span style="color:${pc};font-weight:600">${d.pRate}%</span><div class="sbmini"><div class="sbfill" style="width:${d.pRate}%;background:${pc}"></div></div></td>
+      <td><span style="color:${dc};font-weight:600">${d.dRate===0?'N/A':d.dRate+'%'}</span></td>
+      <td>₹${d.freight.toFixed(1)}</td>
+      <td style="font-size:9px;color:var(--muted)">${zs}</td>
+    </tr>`;
+  }).join('');
+}
+
+function doSender(s,el){document.querySelectorAll('#sc .sender-chip').forEach(c=>c.classList.remove('on'));el.classList.add('on');cS=s;upd();updCharts();}
+function doZone(z,el){document.querySelectorAll('#zc .chip').forEach(c=>c.classList.remove('on'));el.classList.add('on');cZ=z;upd();updCharts();}
+function doLC(v){cLC=+v;document.getElementById('lv').textContent='₹'+v;upd();updLabor();}
+function doReset(){cS='all';cZ='all';cLC=160;document.getElementById('lcs').value=160;document.getElementById('lv').textContent='₹160';document.querySelectorAll('#zc .chip').forEach((c,i)=>c.classList.toggle('on',i===0));document.querySelectorAll('#sc .sender-chip').forEach((c,i)=>c.classList.toggle('on',i===0));upd();updCharts();updLabor();}
+function showP(n,el){document.querySelectorAll('.panel').forEach(p=>p.classList.remove('show'));document.querySelectorAll('.tp').forEach(t=>t.classList.remove('on'));document.getElementById('panel-'+n).classList.add('show');if(el) el.classList.add('on');}
+
+function mkCharts(){
+  const zl=['Zone A','Zone B','Zone C','Zone D','Zone E'],zk=Object.keys(ZD),zc=['#1D9E75','#5DCAA5','#F5A623','#D85A30','#E24B4A'];
+  charts.d=new Chart(document.getElementById('dChart'),{type:'doughnut',data:{labels:['Delivered','In transit','First mile','RTO/Cancel','Not serviceable','Pending'],datasets:[{data:[2460,3097,378,13,106,669],backgroundColor:['#1D9E75','#378ADD','#F5A623','#E24B4A','#64748B','#534AB7'],borderWidth:0,hoverOffset:4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},cutout:'72%'}});
+  charts.v=new Chart(document.getElementById('vChart'),{type:'bar',data:{labels:zl,datasets:[{data:zk.map(z=>ZD[z].total),backgroundColor:zc,borderRadius:4}]},options:{...BO,plugins:{legend:{display:false}}}});
+  charts.s=new Chart(document.getElementById('sChart'),{type:'scatter',data:{datasets:zk.map((z,i)=>({label:zl[i],data:[{x:ZD[z].freight,y:ZD[z].rate}],backgroundColor:zc[i],pointRadius:9,pointHoverRadius:12}))},options:{...BO,plugins:{legend:{display:false}},scales:{x:{...BO.scales.x,title:{display:true,text:'Avg freight (₹)',color:'#64748B',font:{size:9}}},y:{...BO.scales.y,title:{display:true,text:'Delivery %',color:'#64748B',font:{size:9}}}}}});
+  charts.e=new Chart(document.getElementById('eChart'),{type:'bar',data:{labels:zl,datasets:[{data:zk.map(z=>ZD[z].edd),backgroundColor:zc,borderRadius:4}]},options:{...BO,plugins:{legend:{display:false}}}});
+  charts.t=new Chart(document.getElementById('tChart'),{type:'bar',data:{labels:zl,datasets:[{data:[0.2,1.2,2.7,3.0,3.3],backgroundColor:zc,borderRadius:4}]},options:{...BO,plugins:{legend:{display:false}},scales:{...BO.scales,y:{...BO.scales.y,max:4}}}});
+  charts.fz=new Chart(document.getElementById('fzChart'),{type:'bar',data:{labels:zl,datasets:[{data:zk.map(z=>ZD[z].freight),backgroundColor:zc,borderRadius:4}]},options:{...BO,plugins:{legend:{display:false}}}});
+  const sn=Object.keys(SD),sc2=sn.map(n=>SD[n].color);
+  charts.sv=new Chart(document.getElementById('svChart'),{type:'bar',data:{labels:sn,datasets:[{data:sn.map(n=>SD[n].orders),backgroundColor:sc2,borderRadius:4}]},options:{...BO,plugins:{legend:{display:false}}}});
+  charts.sp=new Chart(document.getElementById('spChart'),{type:'bar',data:{labels:sn,datasets:[{data:sn.map(n=>SD[n].pRate),backgroundColor:sn.map(n=>SD[n].pRate>50?'#E24B4A':SD[n].pRate>20?'#F5A623':'#1D9E75'),borderRadius:4}]},options:{...BO,plugins:{legend:{display:false}},scales:{...BO.scales,y:{...BO.scales.y,max:110,ticks:{...TK,callback:v=>v+'%'}}}}});
+  const cl=COURIERS.map(c=>c.n),cc=COURIERS.map(c=>c.rate>=70?'#1D9E75':c.rate>=50?'#F5A623':'#E24B4A');
+  charts.c=new Chart(document.getElementById('cChart'),{type:'bar',data:{labels:cl,datasets:[{data:COURIERS.map(c=>c.rate),backgroundColor:cc,borderRadius:4}]},options:{...BO,indexAxis:'y',scales:{x:{...BO.scales.x,max:100,ticks:{...TK,callback:v=>v+'%'}},y:{...BO.scales.y,ticks:{color:'#94A3B8',font:{size:9}}}}}});
+  charts.ce=new Chart(document.getElementById('ceChart'),{type:'bar',data:{labels:cl,datasets:[{data:COURIERS.map(c=>c.edd),backgroundColor:'#E24B4A',borderRadius:3}]},options:{...BO,indexAxis:'y',scales:{x:{...BO.scales.x},y:{...BO.scales.y,ticks:{color:'#94A3B8',font:{size:8}}}}}});
+  charts.cf=new Chart(document.getElementById('cfChart'),{type:'bar',data:{labels:cl,datasets:[{data:COURIERS.map(c=>c.freight),backgroundColor:'#534AB7',borderRadius:3}]},options:{...BO,indexAxis:'y',scales:{x:{...BO.scales.x},y:{...BO.scales.y,ticks:{color:'#94A3B8',font:{size:8}}}}}});
+  charts.l=new Chart(document.getElementById('lChart'),{type:'bar',data:{labels:['NDR loop','EDD monitoring','Report downloads','Pin checks','Approval emails'],datasets:[{data:[7200,6000,4174,2000,1000],backgroundColor:['#E24B4A','#D85A30','#F5A623','#BA7517','#64748B'],borderRadius:4}]},options:{...BO,indexAxis:'y',plugins:{legend:{display:false}}}});
+  const mo=['M1','M2','M3','M4','M5','M6','M7','M8','M9','M10','M11','M12'];
+  charts.cu=new Chart(document.getElementById('cuChart'),{type:'line',data:{labels:mo,datasets:[{label:'Manual labor',data:mo.map((_,i)=>(i+1)*20374),borderColor:'#E24B4A',backgroundColor:'rgba(226,75,74,0.1)',fill:true,tension:.3,pointRadius:3},{label:'Portal total',data:mo.map((_,i)=>500000+(i+1)*4800),borderColor:'#1D9E75',backgroundColor:'rgba(29,158,117,0.08)',fill:true,tension:.3,pointRadius:3}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{color:GR},ticks:TK},y:{grid:{color:GR},ticks:{...TK,callback:v=>'₹'+(v/1000).toFixed(0)+'k'}}}}});
+}
+
+function updCharts(){
+  const zk=Object.keys(ZD),zl=['Zone A','Zone B','Zone C','Zone D','Zone E'],zc=['#1D9E75','#5DCAA5','#F5A623','#D85A30','#E24B4A'];
+  const fi2=cZ==='all'?[0,1,2,3,4]:[zk.indexOf(cZ)];
+  const fl=fi2.map(i=>zl[i]),fc=fi2.map(i=>zc[i]),fz=fi2.map(i=>zk[i]);
+  const gval=(z,key)=>{if(cS==='all') return ZD[z][key];const sd=SD[cS],sz=sd.zones[z]||0;if(key==='total') return sz;if(key==='edd') return Math.round(ZD[z].edd*(sz/ZD[z].total));return ZD[z][key];};
+  ['v','e'].forEach(k=>{if(!charts[k]) return;charts[k].data.labels=fl;charts[k].data.datasets[0].data=fz.map(z=>gval(z,k==='e'?'edd':'total'));charts[k].data.datasets[0].backgroundColor=fc;charts[k].update();});
+  ['t','fz'].forEach(k=>{if(!charts[k]) return;charts[k].data.labels=fl;charts[k].data.datasets[0].data=fz.map(z=>k==='t'?ZD[z].tat:ZD[z].freight);charts[k].data.datasets[0].backgroundColor=fc;charts[k].update();});
+  if(charts.sv){const bgs=Object.keys(SD).map(n=>cS==='all'?SD[n].color:n===cS?SD[n].color:'#1E3A52');charts.sv.data.datasets[0].backgroundColor=bgs;charts.sv.update();}
+}
+
+function updLabor(){const sc=cLC/160;if(charts.l){charts.l.data.datasets[0].data=[7200,6000,4174,2000,1000].map(v=>Math.round(v*sc));charts.l.update();}if(charts.cu){charts.cu.data.datasets[0].data=Array.from({length:12},(_,i)=>Math.round((i+1)*20374*sc));charts.cu.update();}}
+
+mkCharts();upd();
+</script>
+</body>
+</html>
