@@ -110,7 +110,8 @@ html,body{height:100%;background:var(--bg)}
   </div>
   <div class="topbar-right">
     <div class="live-dot"></div><span class="live-txt">Live</span>
-    <span class="last-upd">Last updated: 11 Mar 2026</span>
+    <span class="last-upd" id="last-upd">⏳ Loading live data...</span>
+    <button onclick="cacheClear();loadLiveData()" style="background:rgba(0,168,150,.15);border:1px solid rgba(0,168,150,.3);color:var(--teal);font-size:10px;font-weight:600;padding:3px 10px;border-radius:20px;cursor:pointer;font-family:inherit">↺ Refresh</button>
     <span class="logo-pill">SC OPS</span>
   </div>
 </div>
@@ -345,10 +346,265 @@ html,body{height:100%;background:var(--bg)}
 </div>
 
 <script>
-const ZD={z_a:{total:1195,delivered:772,rate:64.6,tat:0.2,freight:24.4,edd:19,undeliv:423},z_b:{total:1200,delivered:421,rate:35.1,tat:1.2,freight:29.4,edd:25,undeliv:779},z_c:{total:1139,delivered:362,rate:31.8,tat:2.7,freight:36.9,edd:17,undeliv:777},z_d:{total:2450,delivered:747,rate:30.5,tat:3.0,freight:40.2,edd:69,undeliv:1703},z_e:{total:576,delivered:158,rate:27.4,tat:3.3,freight:50.7,edd:6,undeliv:418}};
-const SD={'Shalini':{orders:3847,processed:3847,pending:0,pRate:0,dRate:8.8,freight:32.9,zones:{z_a:1584,z_b:2043,z_c:1863,z_d:4077,z_e:1035},color:'#1D9E75',ini:'SH'},'Simar':{orders:2141,processed:1393,pending:748,pRate:34.9,dRate:46.9,freight:31.6,zones:{z_a:252,z_b:288,z_c:236,z_d:537,z_e:102},color:'#378ADD',ini:'SI'},'Shreya':{orders:103,processed:103,pending:0,pRate:0,dRate:66.2,freight:28.7,zones:{z_a:125,z_b:24,z_c:16,z_d:36,z_e:0},color:'#F5A623',ini:'SR'},'Muskan':{orders:97,processed:34,pending:63,pRate:64.9,dRate:0,freight:27.7,zones:{z_a:95,z_b:10,z_c:9,z_d:8,z_e:0},color:'#E24B4A',ini:'MU'},'Rhytham':{orders:82,processed:82,pending:0,pRate:0,dRate:77.4,freight:53.1,zones:{z_a:15,z_b:6,z_c:21,z_d:10,z_e:10},color:'#534AB7',ini:'RH'},'Agrima':{orders:79,processed:79,pending:0,pRate:0,dRate:100,freight:44.8,zones:{z_a:95,z_b:28,z_c:47,z_d:18,z_e:9},color:'#00A896',ini:'AG'},'Rakhi Singh':{orders:54,processed:54,pending:0,pRate:0,dRate:92.1,freight:33.5,zones:{z_a:132,z_b:2,z_c:24,z_d:15,z_e:5},color:'#D85A30',ini:'RK'},'Sanya':{orders:30,processed:30,pending:0,pRate:0,dRate:97.4,freight:28.9,zones:{z_a:23,z_b:0,z_c:10,z_d:4,z_e:1},color:'#639922',ini:'SA'}};
-const COURIERS=[{n:'Xpressbees ME',rate:89.5,vol:286,freight:36.3,edd:147},{n:'Ekart ME',rate:80.3,vol:76,freight:53.4,edd:57},{n:'SkyeAir',rate:79.2,vol:48,freight:29.5,edd:38},{n:'Pikndel NDD',rate:66.5,vol:729,freight:24.4,edd:299},{n:'Sfx NDD',rate:53.2,vol:173,freight:22.8,edd:60},{n:'Sfx IC NDD',rate:31.5,vol:346,freight:26.1,edd:56},{n:'Delhivery',rate:32.9,vol:2560,freight:36.3,edd:591},{n:'Sfx MSP',rate:25.4,vol:1965,freight:34.9,edd:328},{n:'Bluedart',rate:16.0,vol:313,freight:62.2,edd:30}];
+// ═══════════════════════════════════════════════════════
+// LIVE DATA CONFIG — SheetDB APIs
+// ═══════════════════════════════════════════════════════
+const API_WH      = 'https://sheetdb.io/api/v1/6aji9dnbcimqo';   // WH Performance sheet
+const API_COURIER = 'https://sheetdb.io/api/v1/wi3eo0p4n4wwl';   // Courier Performance sheet
+const CACHE_KEY_WH  = 'inf_wh_cache';
+const CACHE_KEY_COU = 'inf_cou_cache';
+const CACHE_TTL_MS  = 60 * 60 * 1000; // 1 hour (was 24hrs — now refreshes every hour)
+
+// Sender colour/initials map (display only, not data)
+const SENDER_META = {
+  'Shalini':    {color:'#1D9E75',ini:'SH'}, 'Simar':      {color:'#378ADD',ini:'SI'},
+  'Shreya':     {color:'#F5A623',ini:'SR'}, 'Muskan':     {color:'#E24B4A',ini:'MU'},
+  'Rhytham':    {color:'#534AB7',ini:'RH'}, 'Agrima':     {color:'#00A896',ini:'AG'},
+  'Rakhi Singh':{color:'#D85A30',ini:'RK'}, 'Sanya':      {color:'#639922',ini:'SA'},
+  'Ishika':     {color:'#9B59B6',ini:'IS'}, 'Kaustubh':   {color:'#E67E22',ini:'KA'},
+  'Anshika':    {color:'#2980B9',ini:'AN'}, 'Mehak':      {color:'#16A085',ini:'ME'},
+};
+const ZONE_KEYS  = ['z_a','z_b','z_c','z_d','z_e'];
+const ZONE_NAMES = ['Zone A','Zone B','Zone C','Zone D','Zone E'];
+
+// ── Fallback hardcoded data (shown while loading or if API fails) ──
+let ZD={z_a:{total:1195,delivered:772,rate:64.6,tat:0.2,freight:24.4,edd:19,undeliv:423},z_b:{total:1200,delivered:421,rate:35.1,tat:1.2,freight:29.4,edd:25,undeliv:779},z_c:{total:1139,delivered:362,rate:31.8,tat:2.7,freight:36.9,edd:17,undeliv:777},z_d:{total:2450,delivered:747,rate:30.5,tat:3.0,freight:40.2,edd:69,undeliv:1703},z_e:{total:576,delivered:158,rate:27.4,tat:3.3,freight:50.7,edd:6,undeliv:418}};
+let SD={'Shalini':{orders:3847,processed:3847,pending:0,pRate:0,dRate:8.8,freight:32.9,zones:{z_a:1584,z_b:2043,z_c:1863,z_d:4077,z_e:1035},color:'#1D9E75',ini:'SH'},'Simar':{orders:2141,processed:1393,pending:748,pRate:34.9,dRate:46.9,freight:31.6,zones:{z_a:252,z_b:288,z_c:236,z_d:537,z_e:102},color:'#378ADD',ini:'SI'},'Shreya':{orders:103,processed:103,pending:0,pRate:0,dRate:66.2,freight:28.7,zones:{z_a:125,z_b:24,z_c:16,z_d:36,z_e:0},color:'#F5A623',ini:'SR'},'Muskan':{orders:97,processed:34,pending:63,pRate:64.9,dRate:0,freight:27.7,zones:{z_a:95,z_b:10,z_c:9,z_d:8,z_e:0},color:'#E24B4A',ini:'MU'},'Rhytham':{orders:82,processed:82,pending:0,pRate:0,dRate:77.4,freight:53.1,zones:{z_a:15,z_b:6,z_c:21,z_d:10,z_e:10},color:'#534AB7',ini:'RH'},'Agrima':{orders:79,processed:79,pending:0,pRate:0,dRate:100,freight:44.8,zones:{z_a:95,z_b:28,z_c:47,z_d:18,z_e:9},color:'#00A896',ini:'AG'},'Rakhi Singh':{orders:54,processed:54,pending:0,pRate:0,dRate:92.1,freight:33.5,zones:{z_a:132,z_b:2,z_c:24,z_d:15,z_e:5},color:'#D85A30',ini:'RK'},'Sanya':{orders:30,processed:30,pending:0,pRate:0,dRate:97.4,freight:28.9,zones:{z_a:23,z_b:0,z_c:10,z_d:4,z_e:1},color:'#639922',ini:'SA'}};
+let COURIERS=[{n:'Xpressbees ME',rate:89.5,vol:286,freight:36.3,edd:147},{n:'Ekart ME',rate:80.3,vol:76,freight:53.4,edd:57},{n:'SkyeAir',rate:79.2,vol:48,freight:29.5,edd:38},{n:'Pikndel NDD',rate:66.5,vol:729,freight:24.4,edd:299},{n:'Sfx NDD',rate:53.2,vol:173,freight:22.8,edd:60},{n:'Sfx IC NDD',rate:31.5,vol:346,freight:26.1,edd:56},{n:'Delhivery',rate:32.9,vol:2560,freight:36.3,edd:591},{n:'Sfx MSP',rate:25.4,vol:1965,freight:34.9,edd:328},{n:'Bluedart',rate:16.0,vol:313,freight:62.2,edd:30}];
 let cS='all',cZ='all',cLC=160;
+
+// ═══════════════════════════════════════════════════════
+// CACHE HELPERS
+// ═══════════════════════════════════════════════════════
+function cacheGet(key){
+  try{
+    const raw=localStorage.getItem(key);
+    if(!raw) return null;
+    const {ts,data}=JSON.parse(raw);
+    if(Date.now()-ts > CACHE_TTL_MS){localStorage.removeItem(key);return null;}
+    return data;
+  }catch(e){return null;}
+}
+function cacheSet(key,data){
+  try{localStorage.setItem(key,JSON.stringify({ts:Date.now(),data}));}catch(e){}
+}
+function cacheClear(){
+  localStorage.removeItem(CACHE_KEY_WH);
+  localStorage.removeItem(CACHE_KEY_COU);
+}
+
+// ═══════════════════════════════════════════════════════
+// STATUS BAR
+// ═══════════════════════════════════════════════════════
+function setStatus(msg, color='#64748B'){
+  const el=document.getElementById('last-upd');
+  if(el){el.textContent=msg;el.style.color=color;}
+}
+
+// ═══════════════════════════════════════════════════════
+// DATA PROCESSORS — map SheetDB rows → ZD / SD / COURIERS
+// ═══════════════════════════════════════════════════════
+
+// Column name helpers — adjust these to match your exact sheet column headers
+const COL = {
+  // WH sheet columns
+  wh_sender:      'Mail Sent by',
+  wh_status:      'Fulfillment Status',
+  wh_processed:   'Processed Status',
+  wh_dispatch:    'Dispatch Date',
+  wh_zone:        'Zone',
+  wh_freight:     'Freight',
+  wh_awb:         'AWB No.',
+  wh_edd_breach:  'EDD Breach',
+
+  // Courier sheet columns
+  cou_courier:    'Courier Company',
+  cou_status:     'Status',
+  cou_zone:       'Zone',
+  cou_freight:    'Freight',
+  cou_edd:        'EDD',
+  cou_delivered:  'Order Delivered Date',
+  cou_order_id:   'Order ID',
+};
+
+function zoneKey(zoneStr){
+  if(!zoneStr) return null;
+  const z=String(zoneStr).trim().toUpperCase();
+  if(z.includes('A')||z==='1') return 'z_a';
+  if(z.includes('B')||z==='2') return 'z_b';
+  if(z.includes('C')||z==='3') return 'z_c';
+  if(z.includes('D')||z==='4') return 'z_d';
+  if(z.includes('E')||z==='5') return 'z_e';
+  return null;
+}
+
+function senderKey(raw){
+  if(!raw) return null;
+  const s=String(raw).trim();
+  // Try direct match first
+  const direct=Object.keys(SENDER_META).find(k=>k.toLowerCase()===s.toLowerCase());
+  if(direct) return direct;
+  // Partial match
+  const partial=Object.keys(SENDER_META).find(k=>s.toLowerCase().includes(k.toLowerCase())||k.toLowerCase().includes(s.toLowerCase()));
+  return partial||s; // fallback: use raw name
+}
+
+function processWHData(rows){
+  // Reset ZD and SD
+  const newZD={z_a:{total:0,delivered:0,rate:0,tat:0.2,freight:0,edd:0,undeliv:0},z_b:{total:0,delivered:0,rate:0,tat:1.2,freight:0,edd:0,undeliv:0},z_c:{total:0,delivered:0,rate:0,tat:2.7,freight:0,edd:0,undeliv:0},z_d:{total:0,delivered:0,rate:0,tat:3.0,freight:0,edd:0,undeliv:0},z_e:{total:0,delivered:0,rate:0,tat:3.3,freight:0,edd:0,undeliv:0}};
+  const newSD={};
+
+  rows.forEach(row=>{
+    const sender=senderKey(row[COL.wh_sender]);
+    if(!sender) return;
+
+    const zone=zoneKey(row[COL.wh_zone]);
+    const status=String(row[COL.wh_status]||'').toLowerCase();
+    const procStatus=String(row[COL.wh_processed]||'').toLowerCase();
+    const freight=parseFloat(row[COL.wh_freight])||0;
+    const isDelivered=status.includes('deliver');
+    const isPending=procStatus.includes('pending')||procStatus===''||procStatus==='process pending';
+    const isEDD=String(row[COL.wh_edd_breach]||'').toLowerCase()==='yes'||String(row[COL.wh_edd_breach]||'').toLowerCase()==='true';
+
+    // Build SD entry
+    if(!newSD[sender]){
+      const meta=SENDER_META[sender]||{color:'#64748B',ini:sender.slice(0,2).toUpperCase()};
+      newSD[sender]={orders:0,processed:0,pending:0,pRate:0,dRate:0,freight:0,freightSum:0,zones:{z_a:0,z_b:0,z_c:0,z_d:0,z_e:0},delivered:0,color:meta.color,ini:meta.ini};
+    }
+    const sd=newSD[sender];
+    sd.orders++;
+    sd.freightSum+=freight;
+    if(!isPending) sd.processed++;
+    if(isPending) sd.pending++;
+    if(isDelivered) sd.delivered++;
+    if(zone) sd.zones[zone]=(sd.zones[zone]||0)+1;
+
+    // Build ZD entry
+    if(zone){
+      newZD[zone].total++;
+      newZD[zone].freight+=freight;
+      if(isDelivered) newZD[zone].delivered++;
+      if(isEDD) newZD[zone].edd++;
+    }
+  });
+
+  // Calculate rates
+  Object.keys(newSD).forEach(name=>{
+    const sd=newSD[name];
+    sd.pRate=sd.orders>0?Math.round(sd.pending/sd.orders*100):0;
+    sd.dRate=sd.orders>0?Math.round(sd.delivered/sd.orders*100):0;
+    sd.freight=sd.orders>0?Math.round(sd.freightSum/sd.orders*10)/10:0;
+    delete sd.freightSum;
+    delete sd.delivered;
+  });
+  ZONE_KEYS.forEach(z=>{
+    const zd=newZD[z];
+    zd.rate=zd.total>0?Math.round(zd.delivered/zd.total*1000)/10:0;
+    zd.undeliv=zd.total-zd.delivered;
+    zd.freight=zd.total>0?Math.round(zd.freight/zd.total*10)/10:0;
+  });
+
+  return {newZD,newSD};
+}
+
+function processCourierData(rows){
+  const courierMap={};
+  rows.forEach(row=>{
+    const name=String(row[COL.cou_courier]||'').trim();
+    if(!name) return;
+    const status=String(row[COL.cou_status]||'').toLowerCase();
+    const freight=parseFloat(row[COL.cou_freight])||0;
+    const isDelivered=status.includes('deliver');
+    const isEDD=String(row[COL.wh_edd_breach]||'').toLowerCase()==='yes';
+    if(!courierMap[name]) courierMap[name]={n:name,vol:0,delivered:0,freightSum:0,edd:0};
+    courierMap[name].vol++;
+    courierMap[name].freightSum+=freight;
+    if(isDelivered) courierMap[name].delivered++;
+    if(isEDD) courierMap[name].edd++;
+  });
+  return Object.values(courierMap).map(c=>({
+    n:c.n,
+    rate:c.vol>0?Math.round(c.delivered/c.vol*1000)/10:0,
+    vol:c.vol,
+    freight:c.vol>0?Math.round(c.freightSum/c.vol*10)/10:0,
+    edd:c.edd
+  })).sort((a,b)=>b.rate-a.rate);
+}
+
+// ═══════════════════════════════════════════════════════
+// FETCH FROM SHEETDB (with 1hr cache)
+// ═══════════════════════════════════════════════════════
+async function fetchSheet(url, cacheKey){
+  const cached=cacheGet(cacheKey);
+  if(cached){console.log('Using cache for',cacheKey);return cached;}
+  const res=await fetch(url);
+  if(!res.ok) throw new Error('API error '+res.status);
+  const data=await res.json();
+  cacheSet(cacheKey,data);
+  return data;
+}
+
+async function loadLiveData(){
+  setStatus('🔄 Fetching live data from SheetDB...','#F5A623');
+  try{
+    // Fetch both APIs in parallel
+    const [whRows, couRows] = await Promise.all([
+      fetchSheet(API_WH, CACHE_KEY_WH),
+      fetchSheet(API_COURIER, CACHE_KEY_COU)
+    ]);
+
+    // Process WH data → ZD + SD
+    const {newZD, newSD} = processWHData(whRows);
+    if(Object.keys(newSD).length > 0){
+      ZD=newZD;
+      SD=newSD;
+    }
+
+    // Process Courier data → COURIERS
+    const newCouriers=processCourierData(couRows);
+    if(newCouriers.length > 0) COURIERS=newCouriers;
+
+    // Rebuild sidebar sender chips dynamically
+    buildSenderChips();
+
+    // Refresh all charts and KPIs
+    rebuildCharts();
+    upd();
+
+    const now=new Date();
+    setStatus('✓ Live data · Updated '+now.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}),'#1D9E75');
+    console.log('Live data loaded:',Object.keys(SD).length,'senders,',COURIERS.length,'couriers,',Object.keys(ZD).length,'zones');
+
+  } catch(err){
+    console.warn('SheetDB fetch failed, using cached/fallback data:',err.message);
+    setStatus('⚠ Offline — showing last saved data. Retry in 5 min.','#E24B4A');
+    // Still run with fallback data
+    upd();
+    // Retry after 5 minutes
+    setTimeout(loadLiveData, 5*60*1000);
+  }
+}
+
+function buildSenderChips(){
+  const container=document.getElementById('sc');
+  if(!container) return;
+  const senders=Object.keys(SD).sort((a,b)=>SD[b].orders-SD[a].orders);
+  container.innerHTML=`<div class="sender-chip on" onclick="doSender('all',this)"><span class="s-av" style="background:#1E3A52">A</span>All</div>`
+    +senders.map(name=>{
+      const meta=SD[name];
+      return`<div class="sender-chip" onclick="doSender('${name}',this)"><span class="s-av" style="background:${meta.color}">${meta.ini}</span>${name}</div>`;
+    }).join('');
+}
+
+function rebuildCharts(){
+  // Destroy all existing charts and recreate with fresh data
+  Object.values(charts).forEach(c=>{try{c.destroy()}catch(e){}});
+  Object.keys(charts).forEach(k=>delete charts[k]);
+  mkCharts();
+}
+
+// ── Auto-refresh every 60 minutes ──
+setInterval(()=>{cacheClear();loadLiveData();}, 60*60*1000);
 const charts={};
 const GR='rgba(100,116,139,0.15)',TK={color:'#64748B',font:{size:9}};
 const BO={responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{color:GR},ticks:TK},y:{grid:{color:GR},ticks:TK}}};
@@ -485,7 +741,11 @@ function updCharts(){
 
 function updLabor(){const sc=cLC/160;if(charts.l){charts.l.data.datasets[0].data=[7200,6000,4174,2000,1000].map(v=>Math.round(v*sc));charts.l.update();}if(charts.cu){charts.cu.data.datasets[0].data=Array.from({length:12},(_,i)=>Math.round((i+1)*20374*sc));charts.cu.update();}}
 
-mkCharts();upd();
+// Start with fallback data rendering, then load live
+mkCharts();
+upd();
+// Load live data from SheetDB (replaces charts + KPIs once fetched)
+loadLiveData();
 </script>
 </body>
 </html>
